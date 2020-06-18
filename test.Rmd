@@ -1,0 +1,549 @@
+---
+title: "Expense Tracker for Philippines"
+resource_files:
+- ProjectCCA_0.0.0.9000.tar.gz
+runtime: shiny
+output:
+  flexdashboard::flex_dashboard: null
+  orientation: rows
+  social: menu
+  source_code: embed
+---
+<style>                     
+.navbar {
+  background-color:dark blue;
+  border-color:white;
+}
+.navbar-brand {
+color:white;
+}
+</style>  
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+library(packrat)
+library(PKI)
+library(readxl)
+library(rsconnect)
+library(dplyr)
+library(OutlierDetection)
+library(data.table)
+library(stringr)
+library(shiny)
+library(DT)
+library(tidyverse)
+library(ggplot2)
+library(shinydashboard)
+library(ProjectCCA)
+library(gridExtra)
+library(readxl)
+library(dplyr)
+#library(OutlierDetection)
+library(data.table)
+library(stringr)
+library(shiny)
+library(DT)
+library(tidyverse)
+library(ggplot2)
+library(shinydashboard)
+library(ProjectCCA)
+#Load the data
+#dt <- read.csv("C:/Users/PC-CATHERINE/Downloads/Family Income and Expenditure.csv", stringsAsFactors=FALSE)
+setwd("~/Documents/Summer_Semester_2019_2020/4. Advanced Progamming in R/project/337498_425989_425148")
+
+dt <- read.csv("Family Income and Expenditure.csv", header = TRUE) # Adinda
+
+#dt<- filter_if(dt, is.numeric, any_vars((.) == 0))
+#dt <- filter_if(dt, is.character, any_vars(!is.na(.)))
+#Remove Outliers
+#a<- OutlierDetection(dt[,1])
+#dt$ID <- seq.int(nrow(dt))
+#'%!in%' <- Negate('%in%')
+#dt <- subset(dt, ID %!in% a$`Location of Outlier`)
+#Change the column types
+#dt <- dt %>% mutate_at(vars(matches("of|Electricity|Age|age")),as.factor)
+#dt<- dt %>% mutate_if(!grepl("Expenditure|expenditure|expenses|Total|ID|Area|Value", colnames(dt)),as.factor)
+
+#Check if the column types are correct
+num_var <-colnames(select_if(dt,is.numeric))
+fac_var <-colnames(select_if(dt,is.factor))
+
+
+
+data_num <- dt %>%
+  dplyr::select(num_var)
+
+data_fac <- dt %>%
+  dplyr::select(fac_var)
+
+```
+
+
+Dashboard {data-navmenu="Dynamic Charts and Table with Filters"}
+===================================== 
+
+
+
+Inputs {.sidebar}
+-----------------------------------------------------------------------
+
+
+```{r, echo = FALSE}
+
+selectInput("region",
+                    "Region:",
+                    c(unique(as.character(dt$Region))))
+
+
+selectInput("grade",
+                    "Highest Grade Completed:",
+                    c(unique(as.character(dt$Household.Head.Highest.Grade.Completed )))) 
+
+selectInput("worker",
+                    "Household Head Class of Worker:",
+                    c(unique(as.character(dt$Household.Head.Class.of.Worker))))
+
+
+
+```
+
+
+
+
+Column 
+-----------------------------------------------------------------------
+
+### Charts
+
+```{r, echo=FALSE}
+ dt2 <- reactive({dt[dt$Region == input$region & dt$Household.Head.Highest.Grade.Completed == input$grade & dt$Household.Head.Class.of.Worker == input$worker,] %>% count(Main.Source.of.Income)})
+ 
+ dt3 <- reactive({dt[dt$Region == input$region & dt$Household.Head.Highest.Grade.Completed == input$grade & dt$Household.Head.Class.of.Worker == input$worker,] %>% count(Household.Head.Sex)})
+ 
+ dt4 <- reactive({dt[dt$Region == input$region & dt$Household.Head.Highest.Grade.Completed == input$grade & dt$Household.Head.Class.of.Worker == input$worker,] %>% count(Household.Head.Marital.Status)})
+ 
+ dt5 <- reactive({dt[dt$Region == input$region & dt$Household.Head.Highest.Grade.Completed == input$grade & dt$Household.Head.Class.of.Worker == input$worker,] %>% count(Type.of.Household)})
+ 
+ renderPlot({
+     p1 <- ggplot(dt2(), aes(x= Main.Source.of.Income, y=n, fill=Main.Source.of.Income)) +geom_bar(stat="identity")+theme_minimal()
+     p2 <- ggplot(dt3(), aes(x= Household.Head.Sex, y=n, fill=Household.Head.Sex)) +geom_bar(stat="identity")+theme_minimal()
+     p3 <- ggplot(dt4(), aes(x= Household.Head.Marital.Status, y=n, fill=Household.Head.Marital.Status)) +geom_bar(stat="identity")+theme_minimal()
+     p4 <- ggplot(dt5(), aes(x=  Type.of.Household, y=n, fill=Type.of.Household)) +geom_bar(stat="identity")+theme_minimal()
+     grid.arrange(p1,p2,p3,p4, ncol=2)
+   })
+ 
+ 
+ 
+```
+
+
+Row{.tabset}
+-----------------------------------------------------------------------
+
+
+### Summary  
+```{r, echo = F} 
+ui<-fluidPage(
+
+ box(title = "Data Table", 
+  status = "primary", 
+  solidHeader = TRUE,
+  width = 6,
+  selectInput("information", label="Select Variable",
+          choices = colnames(data_num), selected = "Total.Household.Income")),
+
+box(
+ title = "Data Summary", 
+ status = "warning", 
+ solidHeader = TRUE,
+ width = 6,
+ height = 142,
+ verbatimTextOutput("information")))
+
+
+server <-function (input,output){
+ output$information <- renderPrint({
+ summary(data_num[[input$information]]) 
+})}
+
+shinyApp(ui, server)
+```
+
+
+
+
+
+
+
+
+### Boxplot
+
+```{r, echo=F}
+#### 3.####
+ui <- fluidPage(
+    titlePanel("Boxplot"),
+    sidebarLayout(
+
+    # set the side panel to allow for user input
+    sidebarPanel(
+      selectInput(inputId="x_axis", label="Variable X", choices=colnames(data_num), selected="Total.Household.Income"),
+      selectInput(inputId="y_axis", label="Variable Y", choices=colnames(data_num), selected="Agricultural.Household.indicator")
+    ),
+    mainPanel(plotOutput("scatterPlot"))
+)
+)
+
+server <- (function(input, output) {
+    output$scatterPlot <- renderPlot({
+    p2 <- ggplot(data_num, aes_string(x=input$x_axis, y=input$y_axis)) + geom_boxplot()
+    p2 <- p2 + xlab(input$x_axis) + ylab(input$y_axis)
+    p2
+  })
+})
+
+
+shinyApp(ui, server)
+```
+
+
+### Histogram
+
+```{r, echo=F}
+#### 4. ####
+sliderInput("bins", "Number of bins:", min = 1, max = 50, value = 30)
+
+renderPlot({
+  x <- dt[, 1]  # Total Household income
+  bins <- seq(min(x), max(x), length.out = input$bins + 1)
+
+  # draw the histogram with the specified number of bins
+  hist(x, breaks = bins, col = 'darkblue', border = 'white',
+       xlab = "Household Income", main = "Histogram of Household Income",
+       xlim=c(0,2000000), ylim=c(0,40000))
+}, height = 500)
+```
+
+
+```{r, include=FALSE, echo=F}
+
+data_2 <- dt %>% 
+  count(Region) %>%
+  mutate(per = round(n / sum(n) * 100)) %>%
+  arrange(desc(Region))
+
+
+base_plot <- data_2 %>%
+  ggplot(aes("", per, fill = Region)) +
+  geom_bar(stat = "identity") +
+  scale_fill_discrete(name = "Region of Household") +
+  xlab("") +
+  ylab("Region [%]") +
+  theme(plot.title = element_text(size = 30, hjust = 0.5))
+
+
+min_n <- data_2[order(data_2$per),]
+```
+
+### Bar/Pie Chart
+
+```{r, echo=F}
+#### 5. ####
+ui <- fluidPage(
+  titlePanel("Choose a type of chart with radio buttons"),
+  sidebarLayout(
+  sidebarPanel(
+    radioButtons("type", "Type of chart:", choices = c("Bar", "Pie")),
+    textInput("title", "Tile of a chart:"),
+    actionButton("accept_title", "Change title")
+  ),
+  mainPanel(
+    plotOutput("plt")
+  )
+  ))
+
+server <- function(input, output, session) {
+
+  final_plot_wo_title <- reactive({
+    plt <- base_plot
+    if (input$type == "Pie") {
+      plt <- plt +
+        coord_polar("y") +
+        geom_text(aes(x = 1, y = cumsum(per) - per / 2,
+                      label = str_c(per, "%")))
+    }
+    plt
+  })
+  
+
+  plot_title <- reactive({
+    Sys.sleep(2)
+    input$accept_title
+    isolate(input$title)
+  })
+  
+  
+  output$plt <- renderPlot({
+    final_plot_wo_title() +
+      ggtitle(plot_title())
+  })
+}
+
+shinyApp(ui, server)
+
+
+```
+
+
+### Scatter Plot
+
+```{r, echo=F}
+#### 6. ####
+ui <- fluidPage(
+    sidebarLayout(
+
+    # set the side panel to allow for user input
+    sidebarPanel(
+      selectInput(inputId="x_axis", label="Variable X", choices=colnames(data_num), selected="Total.Household.Income"),
+      selectInput(inputId="y_axis", label="Variable Y", choices=colnames(data_num), selected="Agricultural.Household.indicator")
+    ),
+    mainPanel(plotOutput("scatterPlot"))
+)
+)
+
+server <- (function(input, output) {
+    output$scatterPlot <- renderPlot({
+    p1 <- ggplot(data_num, aes_string(x=input$x_axis, y=input$y_axis)) + geom_point()
+    p1 <- p1 + xlab(input$x_axis) + ylab(input$y_axis)
+    p1
+  })
+})
+
+
+shinyApp(ui, server)
+```
+
+Custom Packages {data-navmenu="Custom Analysis"}
+==============================================================================
+
+Row {.tabset}
+-----------------------------------------------------------------------
+
+
+### AVG_Expenditure
+
+ProjectACC packages contains 6 functions, which were written for Filipino Family Income and Expenditure dataset or any dataset having the same format. 
+
+1.	AVG_Expenditure :  calculates the arithmetic mean of total expenditure based on a given group of region, ignoring missing values.
+
+      AVG_Expenditure <- function(data,region){
+        mydata <- data[data$Region == region,]
+        AVGexpend  =  mean(mydata$Total.Food.Expenditure) + mean(mydata$Clothing..Footwear.and.Other.Wear.Expenditure)+
+          mean(mydata$Imputed.House.Rental.Value)+ mean(mydata$Transportation.Expenditure) +
+          mean(mydata$Education.Expenditure)+ mean(mydata$Special.Occasions.Expenditure)+
+          mean(mydata$Medical.Care.Expenditure)
+        return(AVGexpend)
+      }
+
+```{r, echo=FALSE, include=TRUE, echo=F}
+ProjectCCA::AVG_Expenditure(dt, "CAR")
+```
+
+
+
+### Reg_Expenditure
+
+
+2. Reg_Expenditure: calculates a total expenditure based on a given group of region of a given dataset
+
+    Reg_Expenditure <- function(data, region){
+      mydata <- data[data$Region == region,]
+      total =  sum(mydata$Total.Food.Expenditure) + sum(mydata$Clothing..Footwear.and.Other.Wear.Expenditure)+
+            sum(mydata$Imputed.House.Rental.Value) + sum(mydata$Transportation.Expenditure) +
+            sum(mydata$Education.Expenditure)+ sum(mydata$Special.Occasions.Expenditure)+
+            sum(mydata$Medical.Care.Expenditure)
+       return(total)
+    }
+
+```{r, echo=FALSE, include=TRUE, echo=F}
+ProjectCCA::Reg_Expenditure(dt, "CAR")
+```
+
+
+
+
+### AVG_Income
+
+
+3.	AVG_Income: calculates the arithmetic income based on a given group of region, ignoring missing values.
+
+    AVG_Income <- function(data, region){
+      mydata <- data[data$Region == region,]
+      avgincome <- mean(mydata$Total.Household.Income)
+     return(avgincome)
+    }
+    
+```{r, echo=FALSE, include=TRUE, echo=F}
+ProjectCCA::AVG_Income(dt, "CAR")
+```    
+
+
+
+### Gender_Expenditure
+
+4.	Gender_Expenditure: calculates a total expenditure based on a given gender
+
+    Gender_Expenditure <- function(data,sex){
+      mydata <- data[data$Household.Head.Sex == sex,]
+      total =  sum(mydata$Total.Food.Expenditure) + sum(mydata$Clothing..Footwear.and.Other.Wear.Expenditure)+
+        sum(mydata$Imputed.House.Rental.Value) + sum(mydata$Transportation.Expenditure) +
+        sum(mydata$Education.Expenditure)+ sum(mydata$Special.Occasions.Expenditure)+
+        sum(mydata$Medical.Care.Expenditure)
+      return(total)
+    }
+
+```{r, echo=FALSE, include=TRUE, echo=F}
+renderPlot( ProjectCCA::ExpenditurePlot(dt, "Household.Head.Sex" ), width = 1900, height = 700)
+```
+
+
+
+### ExpenditurePlot
+
+
+5.	ExpenditurePlot :  returns a plot of how expenditure depends on a given variable of a given data. If the variables is factor, it returns a boxplot, it the variables is numeric, it returns scatter plot.
+
+    ExpenditurePlot <- function(data, var){
+      varx <- data[, var]
+      
+      Expenditure <- data$Total.Food.Expenditure + data$Clothing..Footwear.and.Other.Wear.Expenditure +
+        data$Imputed.House.Rental.Value + data$Transportation.Expenditure +
+        data$Education.Expenditure + data$Special.Occasions.Expenditure +
+        data$Medical.Care.Expenditure
+      
+      if(is.factor(varx)) {
+        boxplot(Expenditure ~ varx,
+                data = data,
+                xlab = var,
+                ylab = "Total Expenditure")
+      } else if ( is.numeric(varx)){
+        plot(x = varx, y = Expenditure,
+             xlab = var,
+             ylab = "Total Expenditure")
+      } else {
+        print("No plot")
+      }
+    }
+
+```{r, echo=FALSE, include=TRUE, echo=F}
+renderPlot( ProjectCCA::ExpenditurePlot(dt, "Household.Head.Sex" ), width = 2000, height = 700)
+```
+
+
+### my_reg
+
+
+6.	my_reg: returns a regression plot and p-values for a given formula based on a given data
+
+    my_reg <- function(formula, data) {
+      fit = lm(formula, data)
+      par(mfrow=c(1,1)) 
+      plot(fit)
+      print(summary(fit))
+      invisible(fit)
+    }
+
+```{r, echo=FALSE, include=TRUE, echo=F}
+ProjectCCA::my_reg(Housing.and.water.Expenditure ~ Number.of.Refrigerator.Freezer + Number.of.Airconditioner + Number.of.Landline.wireless.telephones +
+                     Number.of.Personal.Computer + Number.of.Television + Number.of.Washing.Machine + House.Floor.Area, dt )
+
+```
+
+
+
+Table {data-navmenu="Dynamic Charts and Table with Filters"}
+===================================== 
+
+
+Row {.tabset}
+-----------------------------------------------------------------------
+
+### Table with specific Filters
+
+
+```{r, echo = FALSE}
+#### 8. ####
+ui <- fluidPage(
+  titlePanel("Basic DataTable"),
+
+  # Create a new Row in the UI for selectInputs
+ 
+   fluidRow(
+    column(4,
+        selectInput("region",
+                    "Region:",
+                    c("All",
+                      unique(as.character(dt$Region))))
+    ),
+    column(4,
+        selectInput("grade",
+                    "Highest Grade Completed:",
+                    c("All",
+                      unique(as.character(dt$Household.Head.Highest.Grade.Completed ))))
+    ),
+    column(4,
+        selectInput("worker",
+                    "Household Head Class of Worker:",
+                    c("All",
+                      unique(as.character(dt$Household.Head.Class.of.Worker))))
+    )
+  ),
+  # Create a new row for the table.
+  DT::dataTableOutput("table")
+)
+
+
+server <- function(input, output) {
+
+  # Filter data based on selections
+  output$table <- DT::renderDataTable(DT::datatable({
+    data <- dt
+    if (input$region != "All") {
+      data <- data[data$Region == input$region,]
+    }
+    if (input$grade != "All") {
+      data <- data[data$Household.Head.Highest.Grade.Completed == input$grade,]
+    }
+    if (input$worker != "All") {
+      data <- data[data$Household.Head.Class.of.Worker == input$worker,]
+    }
+    data
+  }),class = "display nowrap compact",
+    filter = "top")
+
+}
+
+shinyApp(ui, server)
+```
+
+### Table with All Filters
+
+```{r, echo=F}
+#### 1. Showing data ####
+ui <- fluidPage(fluidRow
+                (column(12, div(dataTableOutput("dataTable")))))
+
+
+server <- function(input, output, session) {
+  output$dataTable <- renderDT(
+    dt, 
+    class = "display nowrap compact",
+    filter = "top" 
+  )
+
+}
+
+shinyApp(ui, server)
+```
